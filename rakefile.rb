@@ -1,27 +1,16 @@
-require "rake/rdoctask"
-require "rake/gempackagetask"
+# Rakefile
+require 'rubygems'
+require 'rake'
+require 'echoe'
 
-spec = eval(File.new("asin.gemspec").readlines.join("\n"))
-
-Rake::GemPackageTask.new(spec) do |pkg|
-  pkg.need_zip = true
-  pkg.need_tar = true
+Echoe.new('amazonian', '0.0.1') do |p|
+  p.description    = "Building out ASIN to use the full Amazon Product Advertising API"
+  p.url            = "http://robacarp.com"
+  p.author         = "Robert Carpenter"
+  p.email          = "robacarp@gmail.com"
+  p.ignore_pattern = ["tmp/*", "script/*"]
+  p.development_dependencies = []
 end
 
+Dir["#{File.dirname(__FILE__)}/tasks/*.rake"].sort.each { |ext| load ext }
 
-Rake::RDocTask.new(:rdoc_dev) do |rd|
-  rd.rdoc_files.include("lib/**/*.rb", "README.rdoc")
-  rd.options + ['-a', '--inline-source', '--charset=UTF-8']
-end
-
-desc "the test task"
-task :test do
-  require 'rake/testtask'
-  Rake::TestTask.new do |t|
-    t.libs << "test"
-    t.ruby_opts << "-rubygems"
-    t.test_files = FileList['test/test_*.rb']
-    t.verbose = true
-  end
-end
-task :default=>:test
