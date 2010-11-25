@@ -1,0 +1,9 @@
+README.rdoc
+asin.gemspec
+init.rb
+lib/amazonian.rb
+rakefile.rb
+test/test_asin.rb
+test/test_helper.rb
+Rakefile
+Manifest
