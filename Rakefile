@@ -9,7 +9,7 @@ Echoe.new('amazonian', '0.0.1') do |p|
   p.author         = "Robert Carpenter"
   p.email          = "robacarp@gmail.com"
   p.ignore_pattern = ["tmp/*", "script/*"]
-  p.development_dependencies = []
+  p.development_dependencies = ['rubygems','hashie','httpclient','crack/xml','cgi','base64','logger']
 end
 
 Dir["#{File.dirname(__FILE__)}/tasks/*.rake"].sort.each { |ext| load ext }
