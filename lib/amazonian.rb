@@ -5,7 +5,7 @@ require 'cgi'
 require 'base64'
 require 'logger'
 
-module ASIN
+module Amazonian
 
   # =Item
   #
