@@ -1,7 +1,0 @@
-Manifest
-README.rdoc
-Rakefile
-init.rb
-lib/amazonian.rb
-test/test_asin.rb
-test/test_helper.rb

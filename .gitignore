@@ -1,5 +1,3 @@
-html
-pkg
+pkg/*
 *.gem
-*.swp
-.DS_Store
+.bundle
