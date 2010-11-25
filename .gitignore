@@ -1,4 +1,5 @@
 html
 pkg
 *.gem
+*.swp
 .DS_Store
