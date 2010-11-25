@@ -1,0 +1,2 @@
+describe Amazonian do
+end
