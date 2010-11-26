@@ -1,18 +1,29 @@
+require 'patron'
+require 'crack'
+require 'hashie'
+
 module Amazonian
-  @@host   = 'webservices.amazon.com'
-  @@path   = '/onca/xml'
+  #worker objects
   @@digest = OpenSSL::Digest::Digest.new('sha256')
   @@logger = Logger.new(STDERR)
   @@patron = Patron::Session.new
-  @@last_response = nil
+
+  #hold the most recent request/response
+  @@request  = nil
+  @@response = nil
+  @@query    = nil
+
+  #configuration variables
+  @@host   = 'webservices.amazon.com'
+  @@path   = '/onca/xml'
+  @@debug  = true
   @@key    = ''
   @@secret = ''
-  @@debug  = false
 
-  mattr_reader   :host,:path,:digest,:patron,:last_response
+  mattr_reader   :host,:path,:response,:request
   mattr_accessor :key,:secret,:debug
 
-  #Configure the patron session
+  #Configure Patron
   @@patron.timeout = 10
 
   # Configure the basic request parameters for Amazonian.
@@ -43,21 +54,31 @@ module Amazonian
   private
 
   def self.call(params)
-    raise "you have to configure ASIN: 'configure :secret => 'your-secret', :key => 'your-key''" if @@key.nil? || @@secret.nil?
+    raise "Cannot call the Amazon API without key and secret key." if @@key.blank? || @@secret.blank?
 
     #get the signed query, and assemble the querystring
     log :debug, "calling with params=#{params}"  if @@debug
-    signed = assemble_querystring params
-    url = "http://#{@@host}#{@@path}?#{signed}"
 
-    log :info, "performing rest call to url='#{url}'" if @@debug
-    @@last_response = @@patron.get url
+    #memoize the last request for faster API querying...
+    query = assemble_querystring params
+    return Crack::XML.parse @@response.body if query == @@query
+    @@query = query
 
-    # force utf-8 chars, works only on 1.9 string
-    log :debug, "got response='#{@@last_response}'" if @@debug
+    #sign the query
+    signed = sign_query query
 
+    #assemble the full URL
+    @@request = "http://#{@@host}#{@@path}?#{signed}"
+
+    #make the call
+    log :info, "performing rest call to '#{@@request}'" if @@debug
+    @@response = @@patron.get @@request
+
+    log :debug, "Response Code: #{@@response.status}" if @@debug
+
+    raise "Amazon API Error: #{@@response.status}" if @@response.status >= 400
     #parse the response and return it
-    Crack::XML.parse @@last_response.body
+    Crack::XML.parse @@response.body
   end
 
   def self.assemble_querystring(params)
@@ -65,20 +86,19 @@ module Amazonian
     params[:Service] = :AWSECommerceService
     params[:AWSAccessKeyId] = @@key
 
-    # UTC timestamp needed for signing
-    params[:Timestamp] = Time.now.utc.strftime '%Y-%m-%dT%H:%M:%SZ'
-
     # CGI escape each param
     # signing needs to order the query alphabetically
-    query = params.map{|key, value| "#{key}=#{CGI.escape(value.to_s)}" }.sort.join('&')
-
-    sign_query query
+    params.map{|key, value| "#{key}=#{CGI.escape(value.to_s)}" }.sort.join('&')
   end
 
   def self.sign_query(query)
+    q = query.clone
+    # UTC timestamp needed for signing
+    q <<= '&Timestamp=' << CGI.escape(Time.now.utc.strftime '%Y-%m-%dT%H:%M:%SZ')
+
     # Sign the entire get-request (not just the querystring)
     # possible gotcha if Patron starts using more/different headers.
-    request_to_sign = %Q{GET\n#{@@host}\n#{@@path}\n#{query}}
+    request_to_sign = %Q{GET\n#{@@host}\n#{@@path}\n#{q}}
 
     # Sign it.
     hmac = OpenSSL::HMAC.digest(@@digest, @@secret, request_to_sign)
@@ -86,7 +106,7 @@ module Amazonian
     # Don't forget to remove the newline from base64
     signature = CGI.escape(Base64.encode64(hmac).chomp)
 
-    "#{query}&Signature=#{signature}"
+    "#{q}&Signature=#{signature}"
   end
 
   def self.log(severity, message)
@@ -113,4 +133,5 @@ module Amazonian
     end
 
   end
+
 end
