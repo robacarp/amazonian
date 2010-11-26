@@ -9,8 +9,8 @@ Gem::Specification.new do |s|
   s.authors     = ["Robert L. Carpenter"]
   s.email       = ["robacarp@robacarp.com"]
   s.homepage    = ""
-  s.summary     = %q{TODO: Write a gem summary}
-  s.description = %q{TODO: Write a gem description}
+  s.summary     = %q{Write a gem summary}
+  s.description = %q{Write a gem description}
 
   s.rubyforge_project = "amazonian"
 
@@ -20,4 +20,15 @@ Gem::Specification.new do |s|
   s.require_paths = ["lib"]
 
   s.add_development_dependency "rspec"
+
+  s.add_dependency "hashie"
+  s.add_dependency "httpclient"
+  s.add_dependency "crack"
+  s.add_dependency "patron"
+  #s.add_dependency "crack/xml"
+  #included in ruby?
+  #s.add_dependency "cgi"
+  #um
+  #s.add_dependency "Base64"
+  #s.add_dependency "logger"
 end

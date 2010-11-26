@@ -1,12 +1,95 @@
-require 'rubygems'
-require 'hashie'
-require 'httpclient'
-require 'crack/xml'
-require 'cgi'
-require 'base64'
-require 'logger'
-
 module Amazonian
+  @@host   = 'webservices.amazon.com'
+  @@path   = '/onca/xml'
+  @@digest = OpenSSL::Digest::Digest.new('sha256')
+  @@logger = Logger.new(STDERR)
+  @@patron = Patron::Session.new
+  @@last_response = nil
+  @@key    = ''
+  @@secret = ''
+  @@debug  = false
+
+  mattr_reader   :host,:path,:digest,:patron,:last_response
+  mattr_accessor :key,:secret,:debug
+
+  #Configure the patron session
+  @@patron.timeout = 10
+
+  # Configure the basic request parameters for Amazonian.
+  def self.setup
+    yield self if block_given?
+  end
+
+  # Performs an +ItemLookup+ REST call against the Amazon API.
+  #
+  # Expects an ASIN (Amazon Standard Identification Number) and returns an +Item+:
+  #
+  #   item = lookup '1430218150'
+  #   item.title
+  #   => "Learn Objective-C on the Mac (Learn Series)"
+  #
+  # ==== Options:
+  #
+  # Additional parameters for the API call like this:
+  #
+  #   lookup(asin, :ResponseGroup => :Medium)
+  #
+  def self.lookup(asin, params={})
+    params = params.merge :Operation => :ItemLookup, :ItemId => asin
+    xml    = self.call params
+    #Item.new 
+    xml
+  end
+
+  private
+
+  def self.call(params)
+    raise "you have to configure ASIN: 'configure :secret => 'your-secret', :key => 'your-key''" if @@key.nil? || @@secret.nil?
+
+    #get the signed query, and assemble the querystring
+    log :debug, "calling with params=#{params}"  if @@debug
+    signed = create_signed_query_string(params)
+    url = "http://#{@@host}#{@@path}?#{signed}"
+
+    log :info, "performing rest call to url='#{url}'" if @@debug
+    @@last_response = @@patron.get url
+
+    # force utf-8 chars, works only on 1.9 string
+    log :debug, "got response='#{@@last_response}'" if @@debug
+
+    #parse the response and return it
+    return @@last_response
+    Crack::XML.parse @@last_response.body
+  end
+
+  def self.create_signed_query_string(params)
+    # Nice tutorial http://cloudcarpenters.com/blog/amazon_products_api_request_signing/
+    params[:Service] = :AWSECommerceService
+    params[:AWSAccessKeyId] = @@key
+
+    # UTC timestamp needed for signing
+    params[:Timestamp] = Time.now.utc.strftime '%Y-%m-%dT%H:%M:%SZ'
+
+    # CGI escape each param
+    # signing needs to order the query alphabetically
+    query = params.map{|key, value| "#{key}=#{CGI.escape(value.to_s)}" }.sort.join('&')
+
+    # Sign the entire get-request (not just the querystring)
+    request_to_sign = %Q{GET\n#{@@host}\n#{@@path}\n#{query}}
+
+    # Sign it.
+    hmac = OpenSSL::HMAC.digest(@@digest, @@secret, request_to_sign)
+
+    # Don't forget to remove the newline from base64
+    signature = CGI.escape(Base64.encode64(hmac).chomp)
+
+    "#{query}&Signature=#{signature}"
+  end
+
+  def self.log(severity, message)
+    @@logger.send severity, message if @@logger
+  end
+
 
   # =Item
   #
@@ -27,87 +110,4 @@ module Amazonian
     end
 
   end
-
-  # Configures the basic request parameters for ASIN.
-  #
-  # Expects at least +secret+ and +key+ for the API call:
-  #
-  #   configure :secret => 'your-secret', :key => 'your-key'
-  #
-  # ==== Options:
-  #
-  # [secret] the API secret key
-  # [key] the API access key
-  # [host] the host, which defaults to 'webservices.amazon.com'
-  # [logger] a different logger than logging to STDERR
-  # 
-  def configure(options={})
-    @options = {
-      :host => 'webservices.amazon.com', 
-      :path => '/onca/xml', 
-      :digest => OpenSSL::Digest::Digest.new('sha256'),
-      :logger => Logger.new(STDERR),
-      :key => '', 
-      :secret => '',
-    } if @options.nil?
-    @options.merge! options
-  end
-
-  # Performs an +ItemLookup+ REST call against the Amazon API.
-  #
-  # Expects an ASIN (Amazon Standard Identification Number) and returns an +Item+:
-  #
-  #   item = lookup '1430218150'
-  #   item.title
-  #   => "Learn Objective-C on the Mac (Learn Series)"
-  #
-  # ==== Options:
-  #
-  # Additional parameters for the API call like this:
-  #
-  #   lookup(asin, :ResponseGroup => :Medium)
-  #
-  def lookup(asin, params={})
-    Item.new(call(params.merge(:Operation => :ItemLookup, :ItemId => asin)))
-  end
-
-  private
-
-  def call(params)
-    raise "you have to configure ASIN: 'configure :secret => 'your-secret', :key => 'your-key''" if @options.nil?
-    log(:debug, "calling with params=#{params}")
-    signed = create_signed_query_string(params)
-    url = "http://#{@options[:host]}#{@options[:path]}?#{signed}"
-    log(:info, "performing rest call to url='#{url}'")
-    resp = HTTPClient.new.get_content(url)
-    # force utf-8 chars, works only on 1.9 string
-    resp = resp.force_encoding('UTF-8') if resp.respond_to? :force_encoding
-    log(:debug, "got response='#{resp}'")
-    Crack::XML.parse(resp)
-  end
-
-  def create_signed_query_string(params)
-    # nice tutorial http://cloudcarpenters.com/blog/amazon_products_api_request_signing/
-    params[:Service] = :AWSECommerceService
-    params[:AWSAccessKeyId] = @options[:key]
-
-    # utc timestamp needed for signing
-    params[:Timestamp] = Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ') 
-
-    # signing needs to order the query alphabetically
-    query = params.map{|key, value| "#{key}=#{CGI.escape(value.to_s)}" }.sort.join('&')
-
-    # yeah, you really need to sign the get-request not the query
-    request_to_sign = "GET\n#{@options[:host]}\n#{@options[:path]}\n#{query}"
-    hmac = OpenSSL::HMAC.digest(@options[:digest], @options[:secret], request_to_sign)
-
-    # don't forget to remove the newline from base64
-    signature = CGI.escape(Base64.encode64(hmac).chomp)
-    "#{query}&Signature=#{signature}"
-  end
-
-  def log(severity, message)
-    @options[:logger].send severity, message if @options[:logger]
-  end
-
 end
