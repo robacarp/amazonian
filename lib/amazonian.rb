@@ -57,7 +57,6 @@ module Amazonian
     log :debug, "got response='#{@@last_response}'" if @@debug
 
     #parse the response and return it
-    return @@last_response
     Crack::XML.parse @@last_response.body
   end
 
