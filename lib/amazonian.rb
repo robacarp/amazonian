@@ -48,7 +48,7 @@ module Amazonian
 
     #get the signed query, and assemble the querystring
     log :debug, "calling with params=#{params}"  if @@debug
-    signed = create_signed_query_string(params)
+    signed = assemble_querystring params
     url = "http://#{@@host}#{@@path}?#{signed}"
 
     log :info, "performing rest call to url='#{url}'" if @@debug
@@ -62,7 +62,7 @@ module Amazonian
     Crack::XML.parse @@last_response.body
   end
 
-  def self.create_signed_query_string(params)
+  def self.assemble_querystring(params)
     # Nice tutorial http://cloudcarpenters.com/blog/amazon_products_api_request_signing/
     params[:Service] = :AWSECommerceService
     params[:AWSAccessKeyId] = @@key
@@ -74,7 +74,12 @@ module Amazonian
     # signing needs to order the query alphabetically
     query = params.map{|key, value| "#{key}=#{CGI.escape(value.to_s)}" }.sort.join('&')
 
+    sign_query query
+  end
+
+  def self.sign_query(query)
     # Sign the entire get-request (not just the querystring)
+    # possible gotcha if Patron starts using more/different headers.
     request_to_sign = %Q{GET\n#{@@host}\n#{@@path}\n#{query}}
 
     # Sign it.
