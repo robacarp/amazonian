@@ -1,24 +1,36 @@
+== Status
+This project is in active development as of 2010-11.
+
+Currently it can be used as a rails plugin, and maybe as a gem (untested).
+
 == Installation
 
-== Usage
+Copy or symlink into your application's /lib folder.
 
+In your ApplicationController:
+
+  class ApplicationController < ActionController::Base
+    include Amazonian
+  end
+
+Then create an initializer in config/initializers:
   require 'amazonian'
-  include Amazonian
-  
-  # use the configure method to setup your api credentials
-  configure :secret => 'your-secret', :key => 'your-key'
-  
-  # lookup an item with the amazon standard identification number (amazonian)
-  item = lookup '1430218150'
-  
-  # have a look at the title of the item
-  item.title
-  => Learn Objective-C on the Mac (Learn Series)
-  
-  # access the internal data representation (Hashie::Mash)
-  item.raw.ItemAttributes.ListPrice.FormattedPrice
-  => $39.99
+  Amazonian.setup do |config|
+    config.secret = 'ZkD9VorhnJjoPxZp8S/bP0K3G4NBQPNQrfU4OOUn'
+    config.key    = 'AKIAJCTUFLKJWEVW6XVQ'
+    #config.debug  = true
+  end
 
-== Infos
+== Usage
+  Amazonian.asin "1430218150"
+  #=> #<Amazonian::Item>
+
+  #soon:
+  Amazonian.search "The art of Computer Programming"  #Title
+  Amazonian.search "978-0201853926"                   #ISBN-13
+  Amazonian.search "0201853922"                       #ISBN-10
+  Amazonian.search "<whateveryouwant>"                #Anything you might put in the search box on Amazon.com.
+
+== Info
 
 For more information on the REST calls, have a look at the whole Amazon E-Commerce-API[http://docs.amazonwebservices.com/AWSEcommerceService/4-0/].
