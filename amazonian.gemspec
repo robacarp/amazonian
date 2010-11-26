@@ -9,10 +9,8 @@ Gem::Specification.new do |s|
   s.authors     = ["Robert L. Carpenter"]
   s.email       = ["robacarp@robacarp.com"]
   s.homepage    = ""
-  s.summary     = %q{Write a gem summary}
-  s.description = %q{Write a gem description}
-
-  s.rubyforge_project = "amazonian"
+  s.summary     = %q{Easy to use ruby module for the Amazon Product Advertising API}
+  s.description = %q{Easy to use ruby module for the Amazon Product Advertising API}
 
   s.files         = `git ls-files`.split("\n")
   s.test_files    = `git ls-files -- {test,spec,features}/*`.split("\n")
@@ -22,9 +20,9 @@ Gem::Specification.new do |s|
   s.add_development_dependency "rspec"
 
   s.add_dependency "hashie"
-  s.add_dependency "httpclient"
   s.add_dependency "crack"
   s.add_dependency "patron"
+  #s.add_dependency "httpclient"
   #s.add_dependency "crack/xml"
   #included in ruby?
   #s.add_dependency "cgi"
