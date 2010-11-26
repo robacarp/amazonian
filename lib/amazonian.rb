@@ -34,11 +34,10 @@ module Amazonian
   #
   #   lookup(asin, :ResponseGroup => :Medium)
   #
-  def self.lookup(asin, params={})
+  def self.asin(asin, params={})
     params = params.merge :Operation => :ItemLookup, :ItemId => asin
     xml    = self.call params
-    #Item.new 
-    xml
+    Item.new xml
   end
 
   private
