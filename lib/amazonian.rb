@@ -47,11 +47,20 @@ module Amazonian
   #
   def self.asin(asin, params={})
     params = params.merge :Operation => :ItemLookup, :ItemId => asin
+    pp params
     xml    = self.call params
-    Item.new xml
+    #Item.new xml
   end
 
-  private
+  def self.search(query, params={})
+    params = params.merge :Operation => :ItemSearch,
+                          :Keywords => query,
+                          :SearchIndex => :Music
+    pp params
+    xml = self.call params
+  end
+
+  #private
 
   def self.call(params)
     raise "Cannot call the Amazon API without key and secret key." if @@key.blank? || @@secret.blank?
@@ -61,7 +70,8 @@ module Amazonian
 
     #memoize the last request for faster API querying...
     query = assemble_querystring params
-    return Crack::XML.parse @@response.body if query == @@query
+    #disabled for now
+    #return Crack::XML.parse @@response.body if query == @@query
     @@query = query
 
     #sign the query
@@ -76,7 +86,8 @@ module Amazonian
 
     log :debug, "Response Code: #{@@response.status}" if @@debug
 
-    raise "Amazon API Error: #{@@response.status}" if @@response.status >= 400
+    #todo, this memo logic is broken....an error code is not always without a body
+    print "Amazon API Error: #{@@response.status}" if @@response.status >= 400
     #parse the response and return it
     Crack::XML.parse @@response.body
   end
@@ -88,25 +99,33 @@ module Amazonian
 
     # CGI escape each param
     # signing needs to order the query alphabetically
-    params.map{|key, value| "#{key}=#{CGI.escape(value.to_s)}" }.sort.join('&')
+    p = params.map{|key, value| "#{key}=#{CGI.escape(value.to_s)}" }.sort.join('&').gsub('+','%20')
+    p p
+    p
   end
 
   def self.sign_query(query)
+    #make a copy... fixme fixme I'm awkward
     q = query.clone
     # UTC timestamp needed for signing
     q <<= '&Timestamp=' << CGI.escape(Time.now.utc.strftime '%Y-%m-%dT%H:%M:%SZ')
 
     # Sign the entire get-request (not just the querystring)
     # possible gotcha if Patron starts using more/different headers.
-    request_to_sign = %Q{GET\n#{@@host}\n#{@@path}\n#{q}}
+    request_to_sign = "GET\n#{@@host}\n#{@@path}\n#{q}"
 
+    "#{q}&Signature=#{sign_request request_to_sign}"
+  end
+
+  def self.sign_request(request_to_sign)
+    p "request to sign:"
+    p request_to_sign
+    p "/request to sign"
     # Sign it.
     hmac = OpenSSL::HMAC.digest(@@digest, @@secret, request_to_sign)
 
     # Don't forget to remove the newline from base64
-    signature = CGI.escape(Base64.encode64(hmac).chomp)
-
-    "#{q}&Signature=#{signature}"
+    CGI.escape(Base64.encode64(hmac).chomp)
   end
 
   def self.log(severity, message)
