@@ -47,17 +47,18 @@ module Amazonian
   #
   def self.asin(asin, params={})
     params = params.merge :Operation => :ItemLookup, :ItemId => asin
-    pp params
     xml    = self.call params
-    #Item.new xml
+    Item.new xml['ItemLookupResponse']['Items']['Item']
   end
 
   def self.search(query, params={})
     params = params.merge :Operation => :ItemSearch,
-                          :Keywords => query,
-                          :SearchIndex => :Music
-    pp params
+                          :Keywords => query
+
+    params[:SearchIndex] = :Music if params[:SearchIndex].nil?
+
     xml = self.call params
+    Search.new xml['ItemSearchResponse']
   end
 
   #private
@@ -66,12 +67,14 @@ module Amazonian
     raise "Cannot call the Amazon API without key and secret key." if @@key.blank? || @@secret.blank?
 
     #get the signed query, and assemble the querystring
-    log :debug, "calling with params=#{params}"  if @@debug
+    log :debug, "Started Amazonian request for params: #{params.map {|p| "#{p[0]}=>#{p[1]}" }.join ','}"  if @@debug
 
     #memoize the last request for faster API querying...
     query = assemble_querystring params
-    #disabled for now
-    #return Crack::XML.parse @@response.body if query == @@query
+    if query == @@query
+      log :debug, "MEMO'D! Shortcutting API call for dup request."
+      return Crack::XML.parse @@response.body
+    end
     @@query = query
 
     #sign the query
@@ -87,7 +90,8 @@ module Amazonian
     log :debug, "Response Code: #{@@response.status}" if @@debug
 
     #todo, this memo logic is broken....an error code is not always without a body
-    print "Amazon API Error: #{@@response.status}" if @@response.status >= 400
+    log :error, "Amazon API Error: #{@@response.status}" if @@response.status >= 400
+
     #parse the response and return it
     Crack::XML.parse @@response.body
   end
@@ -99,9 +103,7 @@ module Amazonian
 
     # CGI escape each param
     # signing needs to order the query alphabetically
-    p = params.map{|key, value| "#{key}=#{CGI.escape(value.to_s)}" }.sort.join('&').gsub('+','%20')
-    p p
-    p
+    params.map{|key, value| "#{key}=#{CGI.escape(value.to_s)}" }.sort.join('&').gsub('+','%20')
   end
 
   def self.sign_query(query)
@@ -118,9 +120,6 @@ module Amazonian
   end
 
   def self.sign_request(request_to_sign)
-    p "request to sign:"
-    p request_to_sign
-    p "/request to sign"
     # Sign it.
     hmac = OpenSSL::HMAC.digest(@@digest, @@secret, request_to_sign)
 
@@ -140,17 +139,23 @@ module Amazonian
   # A Hashie::Mash is used for the internal data representation and can be accessed over the +raw+ attribute.
   #
   class Item
-
     attr_reader :raw
-
     def initialize(hash)
-      @raw = Hashie::Mash.new(hash).ItemLookupResponse.Items.Item
+      @raw = Hashie::Mash.new(hash)
     end
 
     def title
       @raw.ItemAttributes.Title
     end
+  end
 
+  class Search
+    attr_reader :items
+    def initialize(hash)
+      @raw = Hashie::Mash.new(hash)
+      @items = []
+      @raw.Items.Item.each {|i| @items.push Amazonian::Item.new(i) }
+    end
   end
 
 end
