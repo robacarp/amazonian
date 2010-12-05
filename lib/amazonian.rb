@@ -19,9 +19,11 @@ module Amazonian
   @@debug  = true
   @@key    = ''
   @@secret = ''
+  @@default_search = :All
+  @@cache_last = true
 
   mattr_reader   :host,:path,:response,:request
-  mattr_accessor :key,:secret,:debug
+  mattr_accessor :key,:secret,:debug,:default_search,:cache_last
 
   #Configure Patron
   @@patron.timeout = 10
@@ -31,20 +33,6 @@ module Amazonian
     yield self if block_given?
   end
 
-  # Performs an +ItemLookup+ REST call against the Amazon API.
-  #
-  # Expects an ASIN (Amazon Standard Identification Number) and returns an +Item+:
-  #
-  #   item = lookup '1430218150'
-  #   item.title
-  #   => "Learn Objective-C on the Mac (Learn Series)"
-  #
-  # ==== Options:
-  #
-  # Additional parameters for the API call like this:
-  #
-  #   lookup(asin, :ResponseGroup => :Medium)
-  #
   def self.asin(asin, params={})
     params = params.merge :Operation => :ItemLookup, :ItemId => asin
     xml    = self.call params
@@ -55,13 +43,13 @@ module Amazonian
     params = params.merge :Operation => :ItemSearch,
                           :Keywords => query
 
-    params[:SearchIndex] = :Music if params[:SearchIndex].nil?
+    params[:SearchIndex] = @@default_search if params[:SearchIndex].nil?
 
     xml = self.call params
     Search.new xml['ItemSearchResponse']
   end
 
-  #private
+  private
 
   def self.call(params)
     raise "Cannot call the Amazon API without key and secret key." if @@key.blank? || @@secret.blank?
@@ -71,7 +59,7 @@ module Amazonian
 
     #memoize the last request for faster API querying...
     query = assemble_querystring params
-    if query == @@query
+    if @@cache_last && query == @@query
       log :debug, "MEMO'D! Shortcutting API call for dup request."
       return Crack::XML.parse @@response.body
     end
@@ -145,7 +133,11 @@ module Amazonian
     end
 
     def title
-      @raw.ItemAttributes.Title
+      if @raw.ItemAttributes && @raw.ItemAttributes.Title
+        @raw.ItemAttributes.Title
+      else
+        nil
+      end
     end
   end
 
@@ -154,7 +146,9 @@ module Amazonian
     def initialize(hash)
       @raw = Hashie::Mash.new(hash)
       @items = []
-      @raw.Items.Item.each {|i| @items.push Amazonian::Item.new(i) }
+      if @raw.Items && @raw.Items.Item
+        @raw.Items.Item.each {|i| @items.push Amazonian::Item.new(i) }
+      end
     end
   end
 
