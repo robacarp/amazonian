@@ -18,6 +18,8 @@ Then create an initializer in config/initializers:
   Amazonian.setup do |config|
     config.secret = '<>'
     config.key    = '<>'
+    config.secret = '<YOUR SECRET KEY>'
+    config.key    = '<YOUR KEY>'
 
     # prints more debug info to the console. Default: false
     # config.debug  = true
