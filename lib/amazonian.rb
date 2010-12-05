@@ -129,6 +129,7 @@ module Amazonian
   class Item
     attr_reader :raw
     def initialize(hash)
+      pp hash
       @raw = Hashie::Mash.new(hash)
     end
 
@@ -141,6 +142,7 @@ module Amazonian
     end
   end
 
+  #FIXME when searching for an ISBN, it seems to return a different format search index...some sort of array or something.
   class Search
     attr_reader :items
     def initialize(hash)
