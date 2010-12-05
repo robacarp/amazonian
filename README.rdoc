@@ -16,20 +16,29 @@ In your ApplicationController:
 Then create an initializer in config/initializers:
   require 'amazonian'
   Amazonian.setup do |config|
-    config.secret = 'ZkD9VorhnJjoPxZp8S/bP0K3G4NBQPNQrfU4OOUn'
-    config.key    = 'AKIAJCTUFLKJWEVW6XVQ'
-    #config.debug  = true
+    config.secret = '<>'
+    config.key    = '<>'
+
+    # prints more debug info to the console. Default: false
+    # config.debug  = true
+
+    # the default default_search is :All, other tempting options: :Music, :GourmetFood, etc
+    config.default_search = :Music
+
+    # the gem will attempt to filter out duplicate requests.  Default: true
+    config.cache_last = true
   end
 
 == Usage
   Amazonian.asin "1430218150"
   #=> #<Amazonian::Item>
 
-  #soon:
   Amazonian.search "The art of Computer Programming"  #Title
   Amazonian.search "978-0201853926"                   #ISBN-13
   Amazonian.search "0201853922"                       #ISBN-10
   Amazonian.search "<whateveryouwant>"                #Anything you might put in the search box on Amazon.com.
+  Amazonian.search "
+  #=> #<Amazonian::Search>
 
 == Info
 
