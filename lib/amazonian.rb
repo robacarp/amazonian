@@ -2,7 +2,26 @@ require 'patron'
 require 'crack'
 require 'hashie'
 
+#
+# This module is designed to allow easier querying of the Amazon Product Advertising API
+# from within your Ruby or Rails applications.
+#
+# Basic usage requires first calling +Amazonian.setup+ to provide your Amazon AWS Key and
+# Secret key for the module to use in querying the database.
+#
+# Amazons internal product ids can be used to retrieve data from the API with +Amazonian.asin+.
+#
+# Searching for products is done via +Amazonian.search+
+#
+# @author Robert L. Carpenter https://github.com/robacarp/amazonian
+# @author phoet https://github.com/phoet/asin
+#
+# @api Amazon Web Services Product Advertising API
+#
+# @version 0.2.0
+#
 module Amazonian
+
   #worker objects
   @@digest = OpenSSL::Digest::Digest.new('sha256')
   @@logger = Logger.new(STDERR)
@@ -28,17 +47,60 @@ module Amazonian
   #Configure Patron
   @@patron.timeout = 10
 
+  #
   # Configure the basic request parameters for Amazonian.
+  #
+  # Pass in a block with 1 parameter and modify configuration
+  # variables from there.
+  #
+  # @yield [amazonian] Configuration code block.
+  #
+  # @example
+  #     require 'Amazonian'
+  #     Amazonian.setup do |ama|
+  #       ama.key            = "my awesome key for AWS"
+  #       ama.secret         = "super secret secret key for AWS"
+  #       ama.debug          = true
+  #       ama.default_search = :Music
+  #       ama.cache_last     = false
+  #     end
+  #
   def self.setup
     yield self if block_given?
   end
 
+  #
+  # Perform an ASIN (Amazon Standard Identification Number) lookup.
+  #
+  # @param [String] The ASIN with which to query the API.
+  # @param [Hash] Additional options to be passed to the API.
+  # @option params [Symbol] :Operation defaults to :ItemLookup
+  # @option params [Symbol] :ItemLookup defaults to the ASIN passed as param 1.
+  #
+  # @see For more information on the parameters the API accepts, see http://docs.amazonwebservices.com/AWSEcommerceService/4-0/
+  #
+  # @return [Amazonian::Item] Representing the response from the API
+  #
   def self.asin(asin, params={})
     params = params.merge :Operation => :ItemLookup, :ItemId => asin
     xml    = self.call params
     Item.new xml['ItemLookupResponse']['Items']['Item']
   end
 
+  #
+  # Perform a search query to the API.  This is basically the same thing as
+  # searching with the Amazon website.
+  #
+  # @param [String] The search query
+  # @param [Hash] Additional options to be passed to the API
+  # @option params [Symbol] :Operation defaults to :ItemSearch
+  # @option params [Symbol] :Keywords defaults to the passed search query
+  #
+  # @see For more information on the parameters the API accepts, see http://docs.amazonwebservices.com/AWSEcommerceService/4-0/
+  #
+  # @return [Amazonian::Search] Representing the response from the API.  Items returned by the search query are represented as 
+  #   +Amazonian::Item+ inside +Amazonian::Search+
+  #
   def self.search(query, params={})
     params = params.merge :Operation => :ItemSearch,
                           :Keywords => query
@@ -51,6 +113,12 @@ module Amazonian
 
   private
 
+  #
+  # Director function. Builds out the Request, Signs it, Sends it off, and Parses its XML all via small helper functions.
+  #
+  # @param params [Hash] All of the parameters to be formatted into the API REST call.
+  # @return [Crack::XML] The Parsed XML
+  #
   def self.call(params)
     raise "Cannot call the Amazon API without key and secret key." if @@key.blank? || @@secret.blank?
 
@@ -84,6 +152,9 @@ module Amazonian
     Crack::XML.parse @@response.body
   end
 
+  #
+  # Builds out a Query String from a hash of symbols.
+  #
   def self.assemble_querystring(params)
     # Nice tutorial http://cloudcarpenters.com/blog/amazon_products_api_request_signing/
     params[:Service] = :AWSECommerceService
@@ -94,6 +165,9 @@ module Amazonian
     params.map{|key, value| "#{key}=#{CGI.escape(value.to_s)}" }.sort.join('&').gsub('+','%20')
   end
 
+  #
+  # Signs a query string
+  #
   def self.sign_query(query)
     #make a copy... fixme fixme I'm awkward
     q = query.clone
@@ -107,6 +181,9 @@ module Amazonian
     "#{q}&Signature=#{sign_request request_to_sign}"
   end
 
+  #
+  # Signs an entire request string
+  #
   def self.sign_request(request_to_sign)
     # Sign it.
     hmac = OpenSSL::HMAC.digest(@@digest, @@secret, request_to_sign)
@@ -122,7 +199,7 @@ module Amazonian
 
   # =Item
   #
-  # The +Item+ class is a wrapper for the Amazon XML-REST-Response.
+  # The +Item+ class is used to neatly box up the Amazon REST API responses into an Object.
   #
   # A Hashie::Mash is used for the internal data representation and can be accessed over the +raw+ attribute.
   #
@@ -141,6 +218,15 @@ module Amazonian
     end
   end
 
+  # =Search
+  # The +Search+ class is used to neatly box up the Amazon REST API responses into Objects.
+  #
+  # When using Amazonian.search you should receive an Search object.  Search also attempts
+  # to autoboxe all of the Items returned in the search results into an array of +Amazonian::Item+
+  # objects.
+  #
+  # A Hashie::Mash is used for the internal data representation and can be accessed over the +raw+ attribute.
+  #
   class Search
     attr_reader :items
     def initialize(hash)
