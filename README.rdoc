@@ -1,10 +1,7 @@
 == Status
-This project is in active development as of 2010-11.
-
-Currently it can be used as a rails plugin, and maybe as a gem (untested).
+This project is in active development as of 2010-12.
 
 == Installation
-
 Copy or symlink into your application's /lib folder.
 
 In your ApplicationController:
@@ -16,6 +13,7 @@ In your ApplicationController:
 Then create an initializer in config/initializers:
   require 'amazonian'
   Amazonian.setup do |config|
+    #Put your Amazon Web Services Key and Secret Key in here
     config.secret = '<>'
     config.key    = '<>'
 
@@ -29,6 +27,7 @@ Then create an initializer in config/initializers:
     config.cache_last = true
   end
 
+
 == Usage
   Amazonian.asin "1430218150"
   #=> #<Amazonian::Item>
@@ -37,8 +36,8 @@ Then create an initializer in config/initializers:
   Amazonian.search "978-0201853926"                   #ISBN-13
   Amazonian.search "0201853922"                       #ISBN-10
   Amazonian.search "<whateveryouwant>"                #Anything you might put in the search box on Amazon.com.
-  Amazonian.search "
   #=> #<Amazonian::Search>
+
 
 == Info
 
