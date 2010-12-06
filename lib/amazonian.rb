@@ -13,8 +13,8 @@ require 'hashie'
 #
 # Searching for products is done via +Amazonian.search+
 #
-# @author Robert L. Carpenter https://github.com/robacarp/amazonian
-# @author phoet https://github.com/phoet/asin
+# @author Robert L. Carpenter (Modern codebase, interface, gem-ability)
+# @author phoet (Original ASIN interface and implementation of Request Signing, etc.) https://github.com/phoet/asin
 #
 # @api Amazon Web Services Product Advertising API
 #
@@ -28,18 +28,18 @@ module Amazonian
   @@patron = Patron::Session.new
 
   #hold the most recent request/response
-  @@request  = nil
-  @@response = nil
-  @@query    = nil
+  @request  = nil
+  @response = nil
+  @query    = nil
 
   #configuration variables
-  @@host           = 'webservices.amazon.com'
-  @@path           = '/onca/xml'
-  @@debug          = true
-  @@key            = ''
-  @@secret         = ''
-  @@default_search = :All
-  @@cache_last     = true
+  @host           = 'webservices.amazon.com'
+  @path           = '/onca/xml'
+  @debug          = true
+  @key            = ''
+  @secret         = ''
+  @default_search = :All
+  @cache_last     = true
 
   mattr_reader   :host,:path,:response,:request
   mattr_accessor :key,:secret,:debug,:default_search,:cache_last
@@ -105,7 +105,7 @@ module Amazonian
     params = params.merge :Operation => :ItemSearch,
                           :Keywords => query
 
-    params[:SearchIndex] = @@default_search if params[:SearchIndex].nil?
+    params[:SearchIndex] = @default_search if params[:SearchIndex].nil?
 
     xml = self.call params
     Search.new xml['ItemSearchResponse']
@@ -120,36 +120,36 @@ module Amazonian
   # @return [Crack::XML] The Parsed XML
   #
   def self.call(params)
-    raise "Cannot call the Amazon API without key and secret key." if @@key.blank? || @@secret.blank?
+    raise "Cannot call the Amazon API without key and secret key." if @key.blank? || @secret.blank?
 
     #get the signed query, and assemble the querystring
-    log :debug, "Started Amazonian request for params: #{params.map {|p| "#{p[0]}=>#{p[1]}" }.join ','}"  if @@debug
+    log :debug, "Started Amazonian request for params: #{params.map {|p| "#{p[0]}=>#{p[1]}" }.join ','}"  if @debug
 
     #memoize the last request for faster API querying...
     query = assemble_querystring params
-    if @@cache_last && query == @@query && @@response.body
+    if @cache_last && query == @query && @response.body
       log :debug, "MEMO'D! Shortcutting API call for dup request."
-      return Crack::XML.parse @@response.body
+      return Crack::XML.parse @response.body
     end
-    @@query = query
+    @query = query
 
     #sign the query
     signed = sign_query query
 
     #assemble the full URL
-    @@request = "http://#{@@host}#{@@path}?#{signed}"
+    @request = "http://#{@host}#{@path}?#{signed}"
 
     #make the call
-    log :info, "performing rest call to '#{@@request}'" if @@debug
-    @@response = @@patron.get @@request
+    log :info, "performing rest call to '#{@request}'" if @debug
+    @response = @@patron.get @request
 
-    log :debug, "Response Code: #{@@response.status}" if @@debug
+    log :debug, "Response Code: #{@response.status}" if @debug
 
     #todo, this memo logic is broken....an error code is not always without a body
-    log :error, "Amazon API Error: #{@@response.status}" if @@response.status >= 400
+    log :error, "Amazon API Error: #{@response.status}" if @response.status >= 400
 
     #parse the response and return it
-    Crack::XML.parse @@response.body
+    Crack::XML.parse @response.body
   end
 
   #
@@ -158,7 +158,7 @@ module Amazonian
   def self.assemble_querystring(params)
     # Nice tutorial http://cloudcarpenters.com/blog/amazon_products_api_request_signing/
     params[:Service] = :AWSECommerceService
-    params[:AWSAccessKeyId] = @@key
+    params[:AWSAccessKeyId] = @key
 
     # CGI escape each param
     # signing needs to order the query alphabetically
@@ -176,7 +176,7 @@ module Amazonian
 
     # Sign the entire get-request (not just the querystring)
     # possible gotcha if Patron starts using more/different headers.
-    request_to_sign = "GET\n#{@@host}\n#{@@path}\n#{q}"
+    request_to_sign = "GET\n#{@host}\n#{@path}\n#{q}"
 
     "#{q}&Signature=#{sign_request request_to_sign}"
   end
@@ -186,14 +186,14 @@ module Amazonian
   #
   def self.sign_request(request_to_sign)
     # Sign it.
-    hmac = OpenSSL::HMAC.digest(@@digest, @@secret, request_to_sign)
+    hmac = OpenSSL::HMAC.digest(@digest, @secret, request_to_sign)
 
     # Don't forget to remove the newline from base64
     CGI.escape(Base64.encode64(hmac).chomp)
   end
 
   def self.log(severity, message)
-    @@logger.send severity, message if @@logger
+    @logger.send severity, message if @logger
   end
 
 
