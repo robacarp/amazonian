@@ -14,13 +14,13 @@ module Amazonian
   @@query    = nil
 
   #configuration variables
-  @@host   = 'webservices.amazon.com'
-  @@path   = '/onca/xml'
-  @@debug  = true
-  @@key    = ''
-  @@secret = ''
+  @@host           = 'webservices.amazon.com'
+  @@path           = '/onca/xml'
+  @@debug          = true
+  @@key            = ''
+  @@secret         = ''
   @@default_search = :All
-  @@cache_last = true
+  @@cache_last     = true
 
   mattr_reader   :host,:path,:response,:request
   mattr_accessor :key,:secret,:debug,:default_search,:cache_last
@@ -59,7 +59,7 @@ module Amazonian
 
     #memoize the last request for faster API querying...
     query = assemble_querystring params
-    if @@cache_last && query == @@query
+    if @@cache_last && query == @@query && @@response.body
       log :debug, "MEMO'D! Shortcutting API call for dup request."
       return Crack::XML.parse @@response.body
     end
@@ -129,7 +129,6 @@ module Amazonian
   class Item
     attr_reader :raw
     def initialize(hash)
-      pp hash
       @raw = Hashie::Mash.new(hash)
     end
 
@@ -142,14 +141,18 @@ module Amazonian
     end
   end
 
-  #FIXME when searching for an ISBN, it seems to return a different format search index...some sort of array or something.
   class Search
     attr_reader :items
     def initialize(hash)
       @raw = Hashie::Mash.new(hash)
       @items = []
+
       if @raw.Items && @raw.Items.Item
-        @raw.Items.Item.each {|i| @items.push Amazonian::Item.new(i) }
+        if @raw.Items.TotalResults.to_i > 1
+          @raw.Items.Item.each {|i| @items.push Amazonian::Item.new(i) }
+        else
+          @items.push Amazonian::Item.new(@raw.Items.Item)
+        end
       end
     end
   end
